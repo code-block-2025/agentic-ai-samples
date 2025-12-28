@@ -1,0 +1,41 @@
+[project]
+name = "agentic-ai-samples"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bs4>=0.0.2",
+    "gradio>=5.22.0",
+    "httpx>=0.28.1",
+    "ipywidgets>=8.1.5",
+    "lxml>=5.3.1",
+    "mcp-server-fetch>=2025.1.17",
+    "mcp[cli]>=1.5.0",
+    "openai>=1.68.2",
+    "openai-agents>=0.0.15",
+    "playwright>=1.51.0",
+    "plotly>=6.0.1",
+    "polygon-api-client>=1.14.5",
+    "psutil>=7.0.0",
+    "pypdf>=5.4.0",
+    "pypdf2>=3.0.1",
+    "python-dotenv>=1.0.1",
+    "requests>=2.32.3",
+    "semantic-kernel>=1.25.0",
+    "sendgrid>=6.11.0",
+    "setuptools>=78.1.0",
+    "psutil>=7.0.0",
+    "ptyprocess>=0.7.0",
+    "pure-eval>=0.2.3",
+    "pybars4>=0.9.13",
+    "pycparser>=2.22",
+    "pydantic>=2.11.5",
+    "pydantic-core>=2.33.2",
+    "pydantic-settings>=2.9.1",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+]
