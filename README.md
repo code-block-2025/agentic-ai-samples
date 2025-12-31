@@ -21,7 +21,8 @@ Install Python Virtual Environment. Run following commands in Terminal (VSCode/C
 Activate the Environment. Run following command in Terminal:
     .venv\Scripts\activate
 
-Install required packages listed in pyproject.toml in virtual environment. Run followin command in Terminal
+Install required packages listed in pyproject.toml in virtual environment. Run following command(s) in Terminal
+    uv pip install -r requirements.txt
     uv sycn
 
 Open verify.ipynb notebook
@@ -33,7 +34,16 @@ Select venv 3.13.11
 
 Hit run button on Note book cell. Verify Hello World is printed.
 
+Simple LLM call is made provided your Open AI API Key is updated in .env file...
 
+You can generate trial key at: 
+
+https://platform.openai.com/
+
+
+Documentation:
+
+https://platform.openai.com/docs/overview
 
 
 
