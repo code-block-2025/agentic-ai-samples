@@ -22,6 +22,7 @@ Activate the Environment. Run following command in Terminal:
     .venv\Scripts\activate
 
 Install required packages listed in pyproject.toml in virtual environment. Run following command(s) in Terminal
+	uv pip install -r pyproject.toml
     uv pip install -r requirements.txt
     uv sycn
 
@@ -46,6 +47,8 @@ Documentation:
 https://platform.openai.com/docs/overview
 
 
+----------------------------------------------------------------------------------------------------------------------------------------
+uv pip compile pyproject.toml -o requirements.txt
 
 
 
