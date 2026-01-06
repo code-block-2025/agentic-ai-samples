@@ -15,7 +15,7 @@ Clone the repository:  https://github.com/code-block-2025/agentic-ai-samples.git
 
 Ensure you are on root path (Agentic-AI-Samples)
 
-Install Python Virtual Environment. Run following commands in Terminal (VSCode/Cursor)
+Install Python Virtual Environment. Run either of the following commands in Terminal (VSCode/Cursor)
     uv python install 3.13.11
     uv venv --python 3.13.11 
 
@@ -24,7 +24,6 @@ Activate the Environment. Run following command in Terminal:
 
 Install required packages listed in pyproject.toml in virtual environment. Run following command(s) in Terminal
 	uv pip install -r pyproject.toml
-    uv pip install -r requirements.txt
     uv sycn
 
 Open verify.ipynb notebook
@@ -40,7 +39,7 @@ Simple LLM call is made provided your Open AI API Key is updated in .env file...
 
 You can generate trial key at: 
 
-https://platform.openai.com/
+https://platform.openai.com/api-keys
 
 
 Documentation:
@@ -78,6 +77,7 @@ Docs:-
 https://platform.claude.com/docs/en/api/openai-sdk
 https://console.groq.com/docs/overview
 https://ai.google.dev/gemini-api/docs
+https://ai.google.dev/gemini-api/docs/openai
 https://api-docs.deepseek.com/
 
 
