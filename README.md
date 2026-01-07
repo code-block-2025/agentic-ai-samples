@@ -40,7 +40,7 @@ Simple LLM call is made provided your Open AI API Key is updated in .env file...
 
 You can generate trial key at: 
 
-https://platform.openai.com/
+https://platform.openai.com/api-keys
 
 
 Documentation:
@@ -78,6 +78,7 @@ Docs:-
 https://platform.claude.com/docs/en/api/openai-sdk
 https://console.groq.com/docs/overview
 https://ai.google.dev/gemini-api/docs
+https://ai.google.dev/gemini-api/docs/openai
 https://api-docs.deepseek.com/
 
 
