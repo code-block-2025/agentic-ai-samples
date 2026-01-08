@@ -677,6 +677,7 @@ typing-extensions==4.15.0
     #   typer-slim
     #   typing-inspect
     #   typing-inspection
+    #   winrt-runtime
 typing-inspect==0.9.0
     # via dataclasses-json
 typing-inspection==0.4.2
@@ -714,6 +715,46 @@ werkzeug==3.1.1
     #   sendgrid
 widgetsnbextension==4.0.15
     # via ipywidgets
+win11toast==0.36.2
+    # via agentic-ai-samples (pyproject.toml)
+winrt-runtime==3.2.1
+    # via
+    #   winrt-windows-data-xml-dom
+    #   winrt-windows-foundation
+    #   winrt-windows-foundation-collections
+    #   winrt-windows-globalization
+    #   winrt-windows-graphics-imaging
+    #   winrt-windows-media-core
+    #   winrt-windows-media-ocr
+    #   winrt-windows-media-playback
+    #   winrt-windows-media-speechsynthesis
+    #   winrt-windows-storage
+    #   winrt-windows-storage-streams
+    #   winrt-windows-ui-notifications
+winrt-windows-data-xml-dom==3.2.1
+    # via win11toast
+winrt-windows-foundation==3.2.1
+    # via win11toast
+winrt-windows-foundation-collections==3.2.1
+    # via win11toast
+winrt-windows-globalization==3.2.1
+    # via win11toast
+winrt-windows-graphics-imaging==3.2.1
+    # via win11toast
+winrt-windows-media-core==3.2.1
+    # via win11toast
+winrt-windows-media-ocr==3.2.1
+    # via win11toast
+winrt-windows-media-playback==3.2.1
+    # via win11toast
+winrt-windows-media-speechsynthesis==3.2.1
+    # via win11toast
+winrt-windows-storage==3.2.1
+    # via win11toast
+winrt-windows-storage-streams==3.2.1
+    # via win11toast
+winrt-windows-ui-notifications==3.2.1
+    # via win11toast
 xxhash==3.6.0
     # via langgraph
 yarl==1.22.0
