@@ -128,8 +128,6 @@ Run this command: `touch llm_client.py agents.py planner.py tools.py utils.py pr
 
 We store secrets in `.env` so they never appear in code.
 
-**File: **``
-
 ```txt
 GOOGLE_API_KEY=YOUR_API_KEY_HERE
 ```
@@ -143,8 +141,6 @@ Every agent will call the LLM. So we build one shared client that handles:
 - model selection
 - rate limits (429)
 - overload (503)
-
-**File: **``
 
 ```python
 """LLM client wrapper.
@@ -251,8 +247,6 @@ Prompts define the boundaries of each role. They are the policy layer that keeps
 - Planner: tool steps only (JSON)
 - Optimizer: itinerary text only
 - Evaluator: JSON decision only
-
-**File: **``
 
 ```python
 """System prompts for all agents.
@@ -399,8 +393,6 @@ Tools are *not* LLM calls. They are deterministic functions that ground the syst
 
 We also include a forecast date-range helper so we can validate user input and avoid out-of-range errors.
 
-**File: **``
-
 ```python
 """External tools (deterministic).
 
@@ -486,8 +478,6 @@ Agents are small role wrappers around:
 
 This keeps the loop logic in `main.py` readable.
 
-**File: **``
-
 ```python
 """Agent role wrappers.
 
@@ -560,8 +550,6 @@ class ItineraryEvaluatorAgent:
 ## Step 10: Build the Planner Agent (Tool Planning)
 
 The Planner requests tool steps in JSON. Our code executes those tool calls deterministically.
-
-**File: **``
 
 ```python
 """Planner agent.
@@ -684,8 +672,6 @@ Now we wire everything together. This is the only place where we:
 - prompt for user inputs
 - run planner → tools → optimizer
 - run evaluator–optimizer loop (up to 10 tries)
-
-**File: **``
 
 ```python
 """Entry point.
