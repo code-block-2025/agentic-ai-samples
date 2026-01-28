@@ -120,7 +120,7 @@ Create these files:
 - `main.py`
 - `.env`
 
-Run this command: touch llm_client.py agents.py planner.py tools.py utils.py prompts.py main.py .env
+Run this command: `touch llm_client.py agents.py planner.py tools.py utils.py prompts.py main.py .env`
 
 ---
 
