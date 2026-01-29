@@ -20,7 +20,7 @@ uv run python main.py
 
 ## What You Are Building
 
-We will build a system that:
+We will build a travel itinerary planner app that:
 
 1. Prompts the user in the terminal for:
    - city
