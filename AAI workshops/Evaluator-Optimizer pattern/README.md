@@ -8,7 +8,7 @@
 
 In this workshop, we’ll build an **agentic AI workflow** using **Python** and **Google Gemini**, runnable entirely from the **terminal**.
 
-As we go, We’ll build the foundation first (LLM client), then the roles (agents), then the capabilities (tools), then the planner, and finally wire everything together.
+As we go, we’ll build the foundation first (LLM client), then the roles (agents), then the capabilities (tools), then the planner, and finally wire everything together.
 
 Everything runs via:
 
@@ -20,17 +20,17 @@ uv run python main.py
 
 ## What You Are Building
 
-We will build a system that:
+We will build a travel itinerary planner app that:
 
 1. Prompts the user in the terminal for:
    - city
    - start date
    - end date
    - pace (easy / intense)
-2. Uses a **Planner Agent** to decide which tools to call and in what order i.e. geocode_city then get_weather tools, and produce context for the user prompt.
-3. Uses an **Optimizer Agent** to generate (and revise) an itinerary based on the user prompt (and revise itinerary based on feedbacks from evaluator agent).
-4. Uses an **Evaluator Agent** to judge the itinerary provided by optimizer agent and return structured feedback.
-5. Iterates in an **Evaluator–Optimizer loop** until itinerary is approved (or we hit a maximum number of tries).
+2. Uses a **Planner Agent** to decide which tools to call and in what order (geocode\_city then get\_weather), and produce context for the Optimizer.
+3. Uses an **Optimizer Agent** to generate (and revise) an itinerary based on the user prompt.
+4. Uses an **Evaluator Agent** to judge the itinerary provided by the Optimizer and return structured feedback.
+5. Iterates in an **Evaluator–Optimizer loop** until the itinerary is approved (or we hit a maximum number of tries).
 
 ---
 
@@ -120,15 +120,30 @@ Create these files:
 - `main.py`
 - `.env`
 
-Run this command: touch llm_client.py agents.py planner.py tools.py utils.py prompts.py main.py .env
+macOS:
+
+```bash
+touch llm_client.py agents.py planner.py tools.py utils.py prompts.py main.py .env
+```
+
+Windows (PowerShell):
+
+```powershell
+New-Item llm_client.py -ItemType File
+New-Item agents.py -ItemType File
+New-Item planner.py -ItemType File
+New-Item tools.py -ItemType File
+New-Item utils.py -ItemType File
+New-Item prompts.py -ItemType File
+New-Item main.py -ItemType File
+New-Item .env -ItemType File
+```
 
 ---
 
 ## Step 4: Store the API Key
 
 We store secrets in `.env` so they never appear in code.
-
-**File: **``
 
 ```txt
 GOOGLE_API_KEY=YOUR_API_KEY_HERE
@@ -143,8 +158,6 @@ Every agent will call the LLM. So we build one shared client that handles:
 - model selection
 - rate limits (429)
 - overload (503)
-
-**File: **``
 
 ```python
 """LLM client wrapper.
@@ -168,17 +181,7 @@ from google import genai
 
 @dataclass(frozen=True)
 class LLMConfig:
-    """Configuration for LLM calls.
-
-    model_candidates:
-        Ordered list of models to try.
-    per_model_attempts:
-        How many attempts per model before trying the next.
-    rate_limit_wait_seconds:
-        Sleep duration on 429/quota.
-    overload_wait_seconds:
-        Sleep duration on 503/overload.
-    """
+    """Configuration for LLM calls."""
 
     model_candidates: Sequence[str]
     per_model_attempts: int = 2
@@ -187,16 +190,9 @@ class LLMConfig:
 
 
 class GeminiLLMClient:
-    """Retry-aware wrapper around google-genai.
-
-    Call pattern:
-        text = client.generate([system_prompt, user_prompt])
-
-    We keep `contents` as a list of strings to make the workshop simpler.
-    """
+    """Retry-aware wrapper around google-genai."""
 
     def __init__(self, config: LLMConfig):
-        # Fail fast if env is missing; this avoids confusing downstream errors.
         if not os.getenv("GOOGLE_API_KEY"):
             raise RuntimeError("GOOGLE_API_KEY not found in .env")
 
@@ -204,39 +200,29 @@ class GeminiLLMClient:
         self._config = config
 
     def generate(self, contents: List[str]) -> str:
-        """Generate a response from Gemini.
-
-        Returns plain text (empty string if the SDK returns None).
-        Raises on non-transient errors.
-        """
+        """Generate a response from Gemini."""
 
         last_err: Exception | None = None
 
         for model in self._config.model_candidates:
             for _ in range(self._config.per_model_attempts):
                 try:
-                    resp = self._client.models.generate_content(
-                        model=model,
-                        contents=contents,
-                    )
+                    resp = self._client.models.generate_content(model=model, contents=contents)
                     return resp.text or ""
                 except Exception as e:
                     last_err = e
                     msg = str(e).lower()
 
-                    # 429 / quota exhaustion (often temporary per-minute). We wait and retry.
                     if "429" in msg or "quota" in msg or "resource_exhausted" in msg:
                         print(f"[System] Rate limited on {model}. Waiting {self._config.rate_limit_wait_seconds}s...")
                         time.sleep(self._config.rate_limit_wait_seconds)
                         continue
 
-                    # 503 / overload. We wait briefly and retry.
                     if "503" in msg or "overloaded" in msg or "unavailable" in msg:
                         print(f"[System] Model {model} overloaded, waiting {self._config.overload_wait_seconds}s...")
                         time.sleep(self._config.overload_wait_seconds)
                         continue
 
-                    # Non-transient: fail fast.
                     raise
 
         raise last_err if last_err else RuntimeError("Unknown LLM failure")
@@ -252,16 +238,8 @@ Prompts define the boundaries of each role. They are the policy layer that keeps
 - Optimizer: itinerary text only
 - Evaluator: JSON decision only
 
-**File: **``
-
 ```python
-"""System prompts for all agents.
-
-Keep prompts in one place so:
-- role boundaries are visible
-- changes are easy to review
-- other files stay clean
-"""
+"""System prompts for all agents."""
 
 PLANNER_SYSTEM_PROMPT = """
 You are a planning agent responsible for preparing context for a travel itinerary.
@@ -322,6 +300,9 @@ Responsibilities:
 - Verify pacing matches the requested intensity
 - Assess weather suitability
 
+You will be given a Context block that contains the constraints and weather summary.
+You MUST judge the itinerary against that Context.
+
 Output MUST be valid JSON:
 {
   "approved": true | false,
@@ -344,13 +325,8 @@ Utilities are cross-cutting concerns:
 - Startup jitter helps reduce synchronized requests in a workshop.
 - JSON extraction makes the evaluator robust when the model wraps JSON.
 
-**File:**``
-
 ````python
-"""Shared utilities.
-
-These helpers are used in multiple modules to keep the rest of the code focused.
-"""
+"""Shared utilities."""
 
 import json
 import random
@@ -360,23 +336,18 @@ from typing import Any, Dict, Optional
 
 
 def apply_startup_jitter(min_seconds: float = 0.0, max_seconds: float = 1.0) -> None:
-    """Sleep a small random amount to reduce simultaneous API spikes."""
+    """Small random delay to reduce synchronized API spikes."""
     random.seed()
     time.sleep(random.uniform(min_seconds, max_seconds))
 
 
 def extract_json_object(text: str) -> Optional[Dict[str, Any]]:
-    """Extract the first JSON object from a model response.
-
-    Handles common cases where the model wraps JSON in markdown code fences.
-    Returns None if parsing fails.
-    """
+    """Extract the first JSON object from a model response."""
     if not text or not text.strip():
         return None
 
     t = text.strip()
 
-    # Strip markdown fences if present
     if t.startswith("```"):
         t = re.sub(r"^```.*?\n", "", t, flags=re.DOTALL)
         t = re.sub(r"\n?```$", "", t).strip()
@@ -397,35 +368,46 @@ def extract_json_object(text: str) -> Optional[Dict[str, Any]]:
 
 Tools are *not* LLM calls. They are deterministic functions that ground the system in real data.
 
-We also include a forecast date-range helper so we can validate user input and avoid out-of-range errors.
+We also include:
 
-**File: **``
+- city validation error (`CityNotFoundError`)
+- forecast date-range helper (`get_forecast_date_range`) to avoid out-of-range errors
 
 ```python
-"""External tools (deterministic).
-
-These functions are intentionally simple and testable.
-They do not call the LLM.
-"""
+"""External tools (deterministic)."""
 
 import requests
 
 
+class CityNotFoundError(ValueError):
+    """Raised when a city name cannot be resolved to coordinates."""
+
+
 def geocode_city(city: str):
-    """Convert city name → (latitude, longitude) using Open-Meteo geocoding."""
-    print(f"[Tool] Geocoding city - get lat/lon for {city}")
+    """Convert city name → (latitude, longitude). Raises CityNotFoundError if not found."""
+
+    if not validationCall:
+        print(f"[Tool] Geocoding city - get lat/lon for {city}")
 
     url = "https://geocoding-api.open-meteo.com/v1/search"
     params = {"name": city, "count": 1}
 
     data = requests.get(url, params=params).json()
-    location = data["results"][0]
+    results = data.get("results")
 
+    if not results:
+        raise CityNotFoundError(
+            f"City could not be resolved by the geocoding tool: '{city}'. "
+            "Please check spelling and try again."
+        )
+
+    location = results[0]
     return location["latitude"], location["longitude"]
 
 
 def get_forecast_date_range():
     """Return (min_date, max_date) supported by Open-Meteo forecast today."""
+
     url = "https://api.open-meteo.com/v1/forecast"
     params = {"latitude": 0, "longitude": 0, "daily": "weathercode", "timezone": "UTC"}
 
@@ -437,6 +419,7 @@ def get_forecast_date_range():
 
 def get_weather(lat, lon, start_date, end_date):
     """Fetch daily weather codes and return a day-by-day human summary."""
+
     print("[Tool] Fetching weather forecast")
 
     url = "https://api.open-meteo.com/v1/forecast"
@@ -457,7 +440,6 @@ def get_weather(lat, lon, start_date, end_date):
     codes = data["daily"]["weathercode"]
 
     def interpret(code: int) -> str:
-        """Map Open-Meteo weather codes to human labels."""
         if code == 0:
             return "clear sky"
         if 1 <= code <= 3:
@@ -484,19 +466,10 @@ Agents are small role wrappers around:
 - a system prompt
 - the shared LLM client
 
-This keeps the loop logic in `main.py` readable.
-
-**File: **``
+The evaluator now receives the shared Context block.
 
 ```python
-"""Agent role wrappers.
-
-Agents are intentionally thin:
-- Optimizer: generates/revises
-- Evaluator: judges and returns JSON
-
-All LLM calling is delegated to GeminiLLMClient.
-"""
+"""Agent role wrappers."""
 
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -519,31 +492,32 @@ class ItineraryOptimizerAgent:
 
 @dataclass
 class ItineraryEvaluatorAgent:
-    """Evaluates an itinerary and returns a JSON decision."""
+    """Evaluates an itinerary against a provided Context block."""
 
     llm: GeminiLLMClient
     system_prompt: str
 
-    def evaluate(self, itinerary: str, iteration_number: int) -> Dict[str, Any]:
+    def evaluate(self, itinerary: str, iteration_number: int, context: str) -> Dict[str, Any]:
+        """Evaluate itinerary against explicit context (constraints + weather)."""
+
         print("[Agent] Evaluator reviewing itinerary")
 
         txt = self.llm.generate([
             self.system_prompt,
-            f"Iteration number: {iteration_number}\n\n{itinerary}",
+            f"Iteration number: {iteration_number}\n\nContext:\n{context}\n\nItinerary:\n{itinerary}",
         ])
 
         parsed = extract_json_object(txt)
         if parsed is not None:
             return parsed
 
-        # One retry with stricter instruction
         print("[System] Evaluator returned invalid JSON; retrying once...")
         txt2 = self.llm.generate([
             self.system_prompt,
             (
                 f"Iteration number: {iteration_number}\n\n"
                 "Return ONLY valid JSON. No extra text. No markdown.\n\n"
-                f"{itinerary}"
+                f"Context:\n{context}\n\nItinerary:\n{itinerary}"
             ),
         ])
 
@@ -551,29 +525,17 @@ class ItineraryEvaluatorAgent:
         if parsed2 is not None:
             return parsed2
 
-        # Hard fallback keeps the loop moving.
-        return {"approved": False, "issues": ["Pacing may be too aggressive on at least one day."]}
+        return {"approved": False, "issues": ["Evaluator returned invalid JSON output."]}
 ```
 
 ---
 
 ## Step 10: Build the Planner Agent (Tool Planning)
 
-The Planner requests tool steps in JSON. Our code executes those tool calls deterministically.
-
-**File: **``
+Planner is responsible for choosing tool calls and producing planner context.
 
 ```python
-"""Planner agent.
-
-The Planner does not generate itineraries.
-It decides what context to gather and in what order.
-
-In this workshop implementation:
-- the Planner returns JSON tool steps
-- our Python code executes those tools
-- the Planner output is converted into prompt context for the Optimizer
-"""
+"""Planner agent."""
 
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -602,22 +564,11 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
 
 @dataclass
 class PlannerAgent:
-    """Requests tool steps and produces optimizer-ready context."""
-
     llm: GeminiLLMClient
 
     def plan_context(self, city: str, start_date: str, end_date: str, intensity: str) -> Dict[str, str]:
-        state: Dict[str, Any] = {
-            "city": city,
-            "start_date": start_date,
-            "end_date": end_date,
-            "intensity": intensity,
-            "lat": None,
-            "lon": None,
-            "weather": None,
-        }
+        state: Dict[str, Any] = {"city": city, "start_date": start_date, "end_date": end_date, "intensity": intensity, "lat": None, "lon": None, "weather": None}
 
-        # Ask the planner to return tool steps.
         prompt1 = {
             "inputs": {"city": city, "start_date": start_date, "end_date": end_date, "intensity": intensity},
             "available_tools": TOOL_SCHEMAS,
@@ -633,7 +584,6 @@ class PlannerAgent:
         if not isinstance(steps, list):
             return self._fallback(state)
 
-        # Execute steps deterministically.
         for call in steps:
             tool = call.get("tool")
             args = call.get("args", {})
@@ -678,25 +628,12 @@ class PlannerAgent:
 
 ## Step 11: Orchestration (main.py)
 
-Now we wire everything together. This is the only place where we:
+This step wires everything together and also contains input validation.
 
-- load environment variables
-- prompt for user inputs
-- run planner → tools → optimizer
-- run evaluator–optimizer loop (up to 10 tries)
-
-**File: **``
+Input validation messages are labeled explicitly as **[Input Validation]** so they are not mistaken for LLM output.
 
 ```python
-"""Entry point.
-
-This file is intentionally simple:
-- gather inputs
-- assemble components
-- run the workflow
-
-All complexity is pushed into modules we already built.
-"""
+"""Entry point."""
 
 import os
 from datetime import datetime
@@ -704,7 +641,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from tools import get_forecast_date_range
+from tools import get_forecast_date_range, geocode_city, CityNotFoundError
 from utils import apply_startup_jitter
 from llm_client import LLMConfig, GeminiLLMClient
 from agents import ItineraryOptimizerAgent, ItineraryEvaluatorAgent
@@ -718,24 +655,29 @@ MODEL_CANDIDATES = [
     "gemini-2.5-flash",
 ]
 
-# Increased to 10 so the workshop reliably converges even when the model is noisy.
 MAX_TRIES = 10
 
 
 def trip_length(a: str, b: str) -> int:
-    """Compute trip length in days (inclusive)."""
     return (datetime.fromisoformat(b) - datetime.fromisoformat(a)).days + 1
 
 
 def prompt_user_inputs():
-    """Prompt the user for inputs and validate dates against forecast range."""
+    """Prompt for city/dates/intensity and validate them."""
 
-    city = input("City to travel: ").strip()
-
-    # Prevent common workshop failure: weather forecast out-of-range.
     min_date, max_date = get_forecast_date_range()
     if min_date and max_date:
-        print(f"Note: Weather forecasts are available only between {min_date} and {max_date} (inclusive).")
+        print(f"[Input Validation] Weather forecasts are available only between {min_date} and {max_date} (inclusive).")
+
+    # City validation loop
+    while True:
+        city = input("City to travel: ").strip()
+        try:
+            geocode_city(city, True)
+            break
+        except CityNotFoundError as e:
+            print(f"[Input Validation] {e}")
+            print("[Input Validation] Please re-enter the city name.\n")
 
     def read_date(label: str) -> str:
         while True:
@@ -743,45 +685,59 @@ def prompt_user_inputs():
             try:
                 datetime.fromisoformat(s)
             except ValueError:
-                print("Invalid date format. Please use YYYY-MM-DD.")
+                print("[Input Validation] Invalid date format. Please use YYYY-MM-DD.")
                 continue
-
             if min_date and max_date and not (min_date <= s <= max_date):
-                print(f"Date out of forecast range. Enter a date between {min_date} and {max_date}.")
+                print(f"[Input Validation] Date out of forecast range. Enter a date between {min_date} and {max_date}.")
                 continue
-
             return s
 
     start_date = read_date("Start date")
     end_date = read_date("End date")
 
     while end_date < start_date:
-        print("End date must be the same as or after start date.")
+        print("[Input Validation] End date must be the same as or after start date.")
         end_date = read_date("End date")
 
-    intensity = input("Pace (easy/intense): ").strip().lower()
-    if intensity not in ("easy", "intense"):
-        intensity = "easy"
+    # Intensity validation loop
+    while True:
+        intensity = input("Pace (easy/intense): ").strip().lower()
+        if intensity in ("easy", "intense"):
+            break
+        print("[Input Validation] Invalid input. Please type exactly: easy or intense.")
 
     return city, start_date, end_date, intensity
 
 
-def main():
-    """Run the full workflow from the terminal."""
+def build_context(*, days: int, intensity: str, planner_context: str) -> str:
+    """Common context shared across Optimizer and Evaluator."""
 
-    # Load environment variables from .env
+    return f"""
+Trip constraints:
+- Duration: {days} days
+- Desired pace: {intensity}
+- Category balance:
+  * 35% History & heritage
+  * 25% Arts & architecture
+  * 20% Local life & food
+  * 15% Nature & outdoor beauty
+  * 5% Modern / contemporary city
+
+Weather context:
+{planner_context}
+""".strip()
+
+
+def main():
     load_dotenv(Path(__file__).parent / ".env")
     if not os.getenv("GOOGLE_API_KEY"):
         raise RuntimeError("GOOGLE_API_KEY not found in .env")
 
-    # Small random delay to reduce API spikes in a room full of participants.
     apply_startup_jitter()
 
-    # 1) Gather user inputs
     city, start_date, end_date, intensity = prompt_user_inputs()
     days = trip_length(start_date, end_date)
 
-    # 2) Construct the shared LLM client
     llm = GeminiLLMClient(
         LLMConfig(
             model_candidates=MODEL_CANDIDATES,
@@ -791,35 +747,27 @@ def main():
         )
     )
 
-    # 3) Construct agents
     planner = PlannerAgent(llm=llm)
     optimizer = ItineraryOptimizerAgent(llm=llm, system_prompt=OPTIMIZER_SYSTEM_PROMPT)
     evaluator = ItineraryEvaluatorAgent(llm=llm, system_prompt=EVALUATOR_SYSTEM_PROMPT)
 
     print("[System] Starting agentic workflow")
 
-    # 4) Planner prepares context using tools
     plan = planner.plan_context(city=city, start_date=start_date, end_date=end_date, intensity=intensity)
     print("[System] Planner summary:", plan["tool_results_summary"])
 
-    # 5) Optimizer generates the initial itinerary
+    # Shared Context
+    context = build_context(days=days, intensity=intensity, planner_context=plan["prompt_context"])
+
+    # Optimizer uses context
     user_prompt = f"""
 Create a {days}-day travel itinerary for {city}.
 
-Desired pace: {intensity}
+{context}
 
-Constraints:
-- 35% History & heritage
-- 25% Arts & architecture
-- 20% Local life & food
-- 15% Nature & outdoor beauty
-- 5% Modern / contemporary city
-
-Additional context (Planner Agent):
-{plan["prompt_context"]}
-
-Adjust pacing strictly based on the desired pace.
-Provide activities suitable for the weather conditions.
+Rules:
+- Adjust pacing strictly based on the desired pace.
+- Provide activities suitable for the weather conditions.
 """.strip()
 
     current = optimizer.generate(user_prompt)
@@ -828,12 +776,11 @@ Provide activities suitable for the weather conditions.
     print(current)
     print("\n" + "-" * 60 + "\n")
 
-    # 6) Evaluator–Optimizer loop
     for i in range(MAX_TRIES):
         iteration = i + 1
         print(f"[System] Iteration {iteration}")
 
-        evaluation = evaluator.evaluate(current, iteration)
+        evaluation = evaluator.evaluate(current, iteration, context)
 
         if evaluation.get("approved"):
             print("\n[System] Itinerary approved\n")
@@ -868,14 +815,3 @@ From the project root:
 ```bash
 uv run python main.py
 ```
-
----
-
-## Key Takeaway
-
-If you remember only one thing, remember this: the **Evaluator–Optimizer loop** is the decision-making core.
-
-The Planner prepares context. The Optimizer proposes. The Evaluator decides.
-
-That’s what makes the workflow agentic, controllable, and debuggable.
-
