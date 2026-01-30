@@ -145,6 +145,8 @@ New-Item .env -ItemType File
 
 We store secrets in `.env` so they never appear in code.
 
+**File: **``
+
 ```txt
 GOOGLE_API_KEY=YOUR_API_KEY_HERE
 ```
@@ -158,6 +160,8 @@ Every agent will call the LLM. So we build one shared client that handles:
 - model selection
 - rate limits (429)
 - overload (503)
+
+**File: **``
 
 ```python
 """LLM client wrapper.
@@ -237,6 +241,8 @@ Prompts define the boundaries of each role. They are the policy layer that keeps
 - Planner: tool steps only (JSON)
 - Optimizer: itinerary text only
 - Evaluator: JSON decision only
+
+**File: **``
 
 ```python
 """System prompts for all agents."""
@@ -325,6 +331,8 @@ Utilities are cross-cutting concerns:
 - Startup jitter helps reduce synchronized requests in a workshop.
 - JSON extraction makes the evaluator robust when the model wraps JSON.
 
+**File: **``
+
 ````python
 """Shared utilities."""
 
@@ -373,6 +381,8 @@ We also include:
 - city validation error (`CityNotFoundError`)
 - forecast date-range helper (`get_forecast_date_range`) to avoid out-of-range errors
 
+**File: **``
+
 ```python
 """External tools (deterministic)."""
 
@@ -383,7 +393,7 @@ class CityNotFoundError(ValueError):
     """Raised when a city name cannot be resolved to coordinates."""
 
 
-def geocode_city(city: str):
+def geocode_city(city: str, validationCall: bool = False):
     """Convert city name → (latitude, longitude). Raises CityNotFoundError if not found."""
 
     if not validationCall:
@@ -468,6 +478,8 @@ Agents are small role wrappers around:
 
 The evaluator now receives the shared Context block.
 
+**File: **``
+
 ```python
 """Agent role wrappers."""
 
@@ -533,6 +545,8 @@ class ItineraryEvaluatorAgent:
 ## Step 10: Build the Planner Agent (Tool Planning)
 
 Planner is responsible for choosing tool calls and producing planner context.
+
+**File: **``
 
 ```python
 """Planner agent."""
@@ -631,6 +645,8 @@ class PlannerAgent:
 This step wires everything together and also contains input validation.
 
 Input validation messages are labeled explicitly as **[Input Validation]** so they are not mistaken for LLM output.
+
+**File: **``
 
 ```python
 """Entry point."""
@@ -815,3 +831,4 @@ From the project root:
 ```bash
 uv run python main.py
 ```
+
